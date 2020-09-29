@@ -297,7 +297,9 @@ const filter = function() {
   return NodeFilter.FILTER_ACCEPT;
 };
 filter.acceptNode = filter;
-const walker = d.createTreeWalker(d, NodeFilter.SHOW_ALL, filter, false);
+const walker = d.createTreeWalker(d,
+    NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_COMMENT | NodeFilter.SHOW_TEXT,
+    filter, false);
 
 //
 // Classes only below here, const variable declarations only above here...
@@ -485,13 +487,23 @@ class Template {
         // and off by two after it.
         if ((node as Element).hasAttributes()) {
           const {attributes} = node as Element;
+          const attrsToRemove = [];
           for (let i = 0; i < attributes.length; i++) {
-            const {name, value} = attributes[i];
+            // This is the name of the attribute we're iterating over, but not
+            // _neccessarily_ the name of the attribute we will create a part
+            // for. They can be different in browsers that don't iterate on
+            // attributes in source order. In that case the attrNames array
+            // contains the attribute name we'll process next. We only need the
+            // attribute name here to know if we should process a bound attribute
+            // on this element.
+            const {name} = attributes[i];
             if (name.endsWith(boundAttributeSuffix)) {
-              i--;
-              (node as Element).removeAttribute(name);
+              const realName = attrNames[attrNameIndex++];
+              // Lowercase for case-sensitive SVG attributes like viewBox
+              const value = (node as Element).getAttribute(realName.toLowerCase() + boundAttributeSuffix)!;
+              attrsToRemove.push(name);
               const statics = value.split(marker);
-              const m = /([.?@])?(.*)/.exec(attrNames[attrNameIndex++])!;
+              const m = /([.?@])?(.*)/.exec(realName)!;
               this.__parts.push({
                 __type: ATTRIBUTE_PART,
                 __index: nodeIndex,
@@ -508,13 +520,15 @@ class Template {
               });
               bindingIndex += statics.length - 1;
             } else if (name === marker) {
-              (node as Element).removeAttribute(name);
-              i--;
+              attrsToRemove.push(name);
               this.__parts.push({
                 __type: ELEMENT_PART,
                 __index: nodeIndex,
               });
             }
+          }
+          for (const name of attrsToRemove) {
+            (node as Element).removeAttribute(name);
           }
         }
         // TODO (justinfagnani): benchmark the regex against testing for each
