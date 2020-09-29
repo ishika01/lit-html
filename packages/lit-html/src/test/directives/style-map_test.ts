@@ -69,7 +69,9 @@ suite('styleMap', () => {
     const style = div.style;
     assert.equal(style.color, 'red');
     assert.equal(style.backgroundColor, 'blue');
-    assert.equal(style.webkitAppearance, 'none');
+    if ('webkitAppearance' in style) {
+      assert.equal(style.webkitAppearance, 'none');
+    }
     assert.equal(style.paddingLeft, '4px');
   });
 
